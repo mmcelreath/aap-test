@@ -1,0 +1,615 @@
+- name: Apply .NET Application Server Settings for Windows Server 2016
+  gather_facts: False
+  hosts: all
+  tasks:
+  
+  - name: Ensure the required NuGet package provider version is installed
+    win_shell: Find-PackageProvider -Name Nuget -ForceBootstrap -IncludeDependencies -Force
+    #ignore_errors: yes
+
+  - name: Add the PowerShellGet module from PSGallery
+    win_psmodule:
+      name: PowerShellGet
+      repository: PSGallery
+      state: present
+    #ignore_errors: yes
+
+  - name: Add the PackageManagement module from PSGallery
+    win_psmodule:
+      name: PackageManagement
+      repository: PSGallery
+      state: present
+    #ignore_errors: yes
+  
+  - name: Create the DesiredStateConfiguration Event Source
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\services\eventlog\Application\DesiredStateConfiguration
+      state: present
+      name: EventMessageFile
+      type: string
+      data: C:\Windows\Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll
+    #ignore_errors: yes
+  
+  # Windows Features
+
+  - name: Install Windows Features for .NET Application Server
+    win_feature:
+      name: 
+      - Web-Server
+      - Web-WebServer
+      - Web-Common-Http
+      - Web-Default-Doc
+      - Web-Dir-Browsing
+      - Web-Http-Errors
+      - Web-Static-Content
+      - Web-Http-Redirect
+      - Web-Health
+      - Web-Http-Logging
+      - Web-Custom-Logging
+      - Web-Log-Libraries
+      - Web-ODBC-Logging
+      - Web-Request-Monitor
+      - Web-Http-Tracing
+      - Web-Performance
+      - Web-Stat-Compression
+      - Web-Dyn-Compression
+      - Web-Security
+      - Web-Filtering
+      - Web-Client-Auth
+      - Web-Cert-Auth
+      - Web-IP-Security
+      - Web-Url-Auth
+      - Web-Windows-Auth
+      - Web-App-Dev
+      - Web-Net-Ext
+      - Web-Net-Ext45
+      - Web-AppInit
+      - Web-Asp-Net
+      - Web-Asp-Net45
+      - Web-ISAPI-Ext
+      - Web-ISAPI-Filter
+      - Web-Mgmt-Tools
+      - Web-Scripting-Tools
+      - Web-Mgmt-Service
+      - NET-Framework-Features
+      - NET-Framework-Core
+      - NET-HTTP-Activation
+      - NET-Non-HTTP-Activ
+      - NET-Framework-45-Core
+      - NET-Framework-45-ASPNET
+      - NET-WCF-HTTP-Activation45
+      - NET-WCF-Pipe-Activation45
+      - NET-WCF-TCP-Activation45
+      - NET-WCF-TCP-Portsharing45
+      - WAS
+      - WAS-Process-Model
+      - WAS-NET-Environment
+      - WAS-Config-APIs
+      state: present
+    #ignore_errors: yes
+  
+  # AppServer2016 Settings
+
+
+  #  Enable Remote Mgmt 
+  - name: set registry EnableRemoteManagement
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\WebManagement\Server
+      state: present
+      name: EnableRemoteManagement
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: Set service WMSVC startup mode to auto and ensure it is started
+    win_service:
+      name: WMSVC
+      start_mode: auto
+      state: started
+    #ignore_errors: yes
+
+  #=====================#
+  #  IIS Configuration  #
+  #=====================#
+
+  - name: set registry InetStp_EnableRestart to enable IISRESET
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\InetStp
+      state: present
+      name: EnableRestart
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  # Change HTTP API error logging configuration
+  - name: set registry HTTP_Parameters_ErrorLoggingDir
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\HTTP\Parameters
+      state: present
+      name: ErrorLoggingDir
+      type: String
+      data: C:\iislogfiles-New
+    #ignore_errors: yes
+
+  - name: set registry HTTP_Parameters_ErrorLoggingFields
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\HTTP\Parameters
+      state: present
+      name: ErrorLoggingFields
+      type: Dword
+      data: 0x7dff4e7
+    #ignore_errors: yes
+
+  - name: set registry HTTP_Parameters_ErrorLoggingRolloverType
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\HTTP\Parameters
+      state: present
+      name: ErrorLoggingRolloverType
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  #========================#
+  #  Server Configuration  #
+  #========================#
+
+  # Networking configuration
+  - name: set registry LSA_Enable_DisableLoopback
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Control\lsa
+      state: present
+      name: DisableLoopbackCheck
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  # Create Apps directories and shares
+  - name: Create Apps_x64_Directory
+    win_file:
+      path: C:\Program Files\Apps
+      state: directory
+    #ignore_errors: yes
+
+  - name: Create APPFILES64$ share
+    win_share:
+      name: APPFILES64$
+      description: Apps Program Files 64-Bit
+      path: C:\Program Files\Apps
+      list: no
+    #ignore_errors: yes
+
+  - name: Create Apps_x86_Directory
+    win_file:
+      path: C:\Program Files (x86)\Apps
+      state: directory
+    #ignore_errors: yes
+
+  - name: Create APPFILES$ share
+    win_share:
+      name: APPFILES$
+      description: Apps Program Files 32-Bit
+      path: C:\Program Files (x86)\Apps
+      list: no
+    #ignore_errors: yes
+
+  # Share out Microsoft.NET directory
+  - name: Create DOTNET$ share
+    win_share:
+      name: DOTNET$
+      description: Microsoft.NET Directory
+      path: C:\WINDOWS\Microsoft.NET
+      list: no
+    #ignore_errors: yes
+
+  # AppServer2016_EventLogConfig
+
+  - name: set registry AppLog_Key
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\AppLog
+      state: present
+    #ignore_errors: yes
+
+  - name: set registry AppLog_AutoBackupLogFiles
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\AppLog
+      state: present
+      name: AutoBackupLogFiles
+      type: Dword
+      data: 0
+    #ignore_errors: yes
+
+  - name: set registry AppLog_Retention
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\AppLog
+      state: present
+      name: Retention
+      type: Dword
+      data: 0
+    #ignore_errors: yes
+
+  - name: set registry AppLog_MaxSize
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\AppLog
+      state: present
+      name: MaxSize
+      type: Dword
+      data: 33554432
+    #ignore_errors: yes
+
+  - name: set registry ApplicationEventLogAccess_CustomSD
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\Application
+      state: present
+      name: CustomSD
+      type: String
+      data: O:BAG:SYD:(D;;0xf0007;;;AN)(D;;0xf0007;;;BG)(A;;0xf0007;;;SY)(A;;0x7;;;BA)(A;;0x7;;;SO)(A;;0x3;;;IU)(A;;0x3;;;SU)(A;;0x3;;;S-1-5-3)(A;;0x1;;;AU)
+    #ignore_errors: yes
+
+  - name: set registry SystemEventLogAccess_CustomSD
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\System
+      state: present
+      name: CustomSD
+      type: String
+      data: O:BAG:SYD:(D;;0xf0007;;;AN)(D;;0xf0007;;;BG)(A;;0xf0007;;;SY)(A;;0x7;;;BA)(A;;0x7;;;SO)(A;;0x3;;;IU)(A;;0x3;;;SU)(A;;0x3;;;S-1-5-3)(A;;0x1;;;AU)
+    #ignore_errors: yes
+
+  - name: set registry AppLogEventLogAccess_CustomSD
+    win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\AppLog
+      state: present
+      name: CustomSD
+      type: String
+      data: O:BAG:SYD:(D;;0xf0007;;;AN)(D;;0xf0007;;;BG)(A;;0xf0007;;;SY)(A;;0x7;;;BA)(A;;0x7;;;SO)(A;;0x3;;;IU)(A;;0x3;;;SU)(A;;0x3;;;S-1-5-3)(A;;0x1;;;AU)
+    #ignore_errors: yes
+  
+  # NETAppServer2016_MSDTCConfig
+
+  - name: set registry AllowOnlySecureRpcCalls
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC
+      state: present
+      name: AllowOnlySecureRpcCalls
+      type: Dword
+      data: 0
+    #ignore_errors: yes
+
+  - name: set registry AllowOnlySecureRpcCalls_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\
+      state: present
+      name: AllowOnlySecureRpcCalls
+      type: Dword
+      data: 0
+    #ignore_errors: yes
+
+  - name: set registry FallbackToUnsecureRPCIfNecessary
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC
+      state: present
+      name: FallbackToUnsecureRPCIfNecessary
+      type: Dword
+      data: 0
+    #ignore_errors: yes
+
+  - name: set registry FallbackToUnsecureRPCIfNecessary_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\
+      state: present
+      name: FallbackToUnsecureRPCIfNecessary
+      type: Dword
+      data: 0
+    #ignore_errors: yes
+
+  - name: set registry TurnOffRpcSecurity
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC
+      state: present
+      name: TurnOffRpcSecurity
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry TurnOffRpcSecurity_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\
+      state: present
+      name: TurnOffRpcSecurity
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry LuTransactions
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC\Security
+      state: present
+      name: LuTransactions
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry LuTransactions_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\Security
+      state: present
+      name: LuTransactions
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessClients
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC\Security
+      state: present
+      name: NetworkDtcAccessClients
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessClients_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\Security
+      state: present
+      name: NetworkDtcAccessClients
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessTransactions
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC\Security
+      state: present
+      name: NetworkDtcAccessTransactions
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessTransactions_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\Security
+      state: present
+      name: NetworkDtcAccessTransactions
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccess
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC\Security
+      state: present
+      name: NetworkDtcAccess
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccess_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\Security\
+      state: present
+      name: NetworkDtcAccess
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessInbound
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC\Security
+      state: present
+      name: NetworkDtcAccessInbound
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessInbound_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\Security\
+      state: present
+      name: NetworkDtcAccessInbound
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessOutbound
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC\Security
+      state: present
+      name: NetworkDtcAccessOutbound
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry NetworkDtcAccessOutbound_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\Security\
+      state: present
+      name: NetworkDtcAccessOutbound
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry XaTransactions
+    win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\MSDTC\Security
+      state: present
+      name: XaTransactions
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  - name: set registry XaTransactions_WOW6432Node
+    win_regedit:
+      path: HKLM:\SOFTWARE\WOW6432Node\Microsoft\MSDTC\Security\
+      state: present
+      name: XaTransactions
+      type: Dword
+      data: 1
+    #ignore_errors: yes
+
+  # RelocateInetpub
+
+  - name: Create IISLOGFILES_Directory
+    win_file:
+      path: C:\iislogfiles-New
+      state: directory
+    #ignore_errors: yes
+
+  - name: Set IISLOGFILES_Permission_SYSTEM
+    win_acl:
+      user: SYSTEM
+      path: C:\iislogfiles-New
+      type: allow
+      rights: FullControl
+    #ignore_errors: yes
+
+  - name: Set IISLOGFILES_Permission_Administrators
+    win_acl:
+      user: Administrators
+      path: C:\iislogfiles-New
+      type: allow
+      rights: FullControl
+    #ignore_errors: yes
+
+  - name: Set IISLOGFILES_Permission_IIS_IUSRS
+    win_acl:
+      user: IIS_IUSRS
+      path: C:\iislogfiles-New
+      type: allow
+      rights: Modify,DeleteSubdirectoriesAndFiles
+    #ignore_errors: yes
+
+  - name: Set IISLOGFILES_Permission_Users
+    win_acl:
+      user: Users
+      path: C:\iislogfiles-New
+      type: allow
+      rights: ReadAndExecute
+    #ignore_errors: yes
+
+  # Share IISLOGFILES$ #
+  - name: Create IISLOGFILES$ share
+    win_share:
+      name: IISLOGFILES$
+      description: Web Server Logfiles
+      path: C:\iislogfiles-New
+      list: no
+    #ignore_errors: yes
+
+  - name: Test if c:\inetpub-New exists
+    win_stat: 
+      path: c:\inetpub-New
+    register: inetpub_d
+    #ignore_errors: yes
+
+  - name: Copy the contents of c:\inetpub to c:\inetpub-New if folder doesn't already exist on c:\
+    win_robocopy:
+      src: C:\inetpub
+      dest: c:\inetpub-New
+      recurse: yes
+    when: not inetpub_d.stat.exists
+    #ignore_errors: yes
+
+  - name: set registry Microsoft_inetstp_PathWWWRoot
+    win_regedit:
+      path: HKLM:\Software\Microsoft\inetstp
+      state: present
+      name: PathWWWRoot
+      type: String
+      data: c:\inetpub-New\wwwroot
+    #ignore_errors: yes
+
+  - name: set registry Microsoft_inetstp_PathFTPRoot
+    win_regedit:
+      path: HKLM:\Software\Microsoft\inetstp
+      state: present
+      name: PathFTPRoot
+      type: String
+      data: c:\inetpub-New\ftproot
+    #ignore_errors: yes
+
+  - name: set registry Wow6432Node_Microsoft_inetstp_PathWWWRoot
+    win_regedit:
+      path: HKLM:\Software\Wow6432Node\Microsoft\inetstp
+      state: present
+      name: PathWWWRoot
+      type: String
+      data: c:\inetpub-New\wwwroot
+    #ignore_errors: yes
+
+  - name: set registry Wow6432Node_Microsoft_inetstp_PathFTPRoot
+    win_regedit:
+      path: HKLM:\Software\Wow6432Node\Microsoft\inetstp
+      state: present
+      name: PathFTPRoot
+      type: String
+      data: c:\inetpub-New\ftproot
+    #ignore_errors: yes
+
+  # Update permissions on certain folders to where inetpub has been relocated
+
+  - name: Set INETPUB_Permission_TrustedInstaller
+    win_acl:
+      user: NT SERVICE\TrustedInstaller
+      path: c:\inetpub-New
+      type: allow
+      rights: FullControl
+    #ignore_errors: yes
+
+  - name: Set INETPUB_Permission_Users
+    win_acl:
+      user: Users
+      path: c:\inetpub-New
+      type: allow
+      rights: ReadAndExecute
+    #ignore_errors: yes
+
+  - name: Set WWWROOT_Permission_IIS_IUSRS
+    win_acl:
+      user: IIS_IUSRS
+      path: c:\inetpub-New\wwwroot
+      type: allow
+      rights: ReadAndExecute
+    #ignore_errors: yes
+
+  - name: Set TEMP_APPPOOLS_Permission_IIS_IUSRS
+    win_acl:
+      user: IIS_IUSRS
+      path: c:\inetpub-New\temp\appPools
+      type: allow
+      rights: ReadAndExecute
+    #ignore_errors: yes
+
+  - name: Set TEMP_COMPRESSEDFILES_Permission_IIS_IUSRS
+    win_acl:
+      user: IIS_IUSRS
+      path: c:\inetpub-New\temp\IIS Temporary Compressed Files
+      type: allow
+      rights: FullControl
+    #ignore_errors: yes
+
+  - name: Create INETPUB$ share
+    win_share:
+      name: INETPUB$
+      description: All Sites Web Content
+      path: c:\inetpub-New
+      list: no
+    #ignore_errors: yes
+
+  - name: Test if C:\iislogfiles-New\W3SVC1 exists
+    win_stat: 
+      path: C:\iislogfiles-New\W3SVC1
+    register: W3SVC1_folder
+    #ignore_errors: yes
+
+  - name: If the W3SVC1 folder does not exist, send a web request to the default website to trigger the creation of the folder
+    win_shell: Invoke-WebRequest "http://localhost" -UseBasicParsing -UseDefaultCredentials
+    when: not W3SVC1_folder.stat.exists
+    #ignore_errors: yes
+
+  - name: Set W3SVC1_Directory
+    win_acl:
+      user: Users
+      path: C:\iislogfiles-New\W3SVC1
+      type: allow
+      rights: ReadAndExecute 
+    #ignore_errors: yes
+      
