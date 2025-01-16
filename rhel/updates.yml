@@ -1,0 +1,9 @@
+- name: Run DNF Upgrades
+  gather_facts: False
+  hosts: all
+  tasks:
+
+  - name: Upgrade all packages
+    ansible.builtin.dnf:
+      name: "*"
+      state: latest
