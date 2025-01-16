@@ -7,3 +7,4 @@
     ansible.builtin.dnf:
       name: "*"
       state: latest
+    sudo: yes
