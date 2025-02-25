@@ -14,5 +14,4 @@
         - 192.168.7.234
         - 192.168.4.1
       state: present
-    ansible_become_user: root
     ansible_become_password: '{{ become_password }}' 
