@@ -11,4 +11,6 @@
       dns4:
         - 192.168.7.234
         - 192.168.4.1
+      dns4_search:
+        - corp.local
       state: present
