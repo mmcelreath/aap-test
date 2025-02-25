@@ -1,6 +1,7 @@
 - name: Configure DNS Settings in NetworkManager
   gather_facts: False
   hosts: all
+  become: true
   tasks:
 
   - name: Add IPv4 DNS server addresses
@@ -11,4 +12,3 @@
         - 192.168.7.234
         - 192.168.4.1
       state: present
-    become: true
